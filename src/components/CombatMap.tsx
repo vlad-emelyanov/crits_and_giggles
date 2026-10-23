@@ -30,6 +30,16 @@ interface CombatMapProps {
 
 const DEFAULT_MAP_SIZE: MapSize = { width: 20, height: 20 };
 
+/**
+ * Board geometry in CSS pixels. The battlemap image is scaled so that one of its squares is exactly
+ * CELL_PX wide and placed LABEL_COL_PX from the left and HEADER_ROW_PX from the top of the table, so
+ * the table has to be laid out at exactly these sizes: fixed layout with an explicit width, and
+ * border-box cells without padding (the .combat-grid-* rules in index.css use the same numbers).
+ */
+const CELL_PX = 42;
+const HEADER_ROW_PX = 32;
+const LABEL_COL_PX = 38;
+
 interface GridCellProps {
   colIdx: number;
   rowIdx: number;
@@ -177,9 +187,9 @@ export function CombatMap({
     return mapSize || DEFAULT_MAP_SIZE;
   }, [activeMapUrl, gridConfig, mapSize]);
 
-  // Scaled background alignment math to perfectly map board cells (42px) to battlemap grid
+  // Scaled background alignment math to map board cells (CELL_PX) onto the battlemap's squares
   const { backdropSize, backdropPosition } = useMemo(() => {
-    const D = 42;
+    const D = CELL_PX;
     const currentGrid = activeMapUrl ? gridConfig : null;
     if (currentGrid && currentGrid.cellPitch > 0) {
       const s = currentGrid.cellPitch;
@@ -867,16 +877,18 @@ export function CombatMap({
         aria-hidden={isModalActive ? true : undefined}
         style={{ overflowX: 'auto', border: '2px solid #495057', borderRadius: '6px', backgroundColor: '#121416', position: 'relative' }}
       >
-        <div style={{ display: 'inline-block', position: 'relative', minWidth: '100%' }}>
+        {/* Exactly as wide as the table, so the backdrop stays under the cells whether the board is
+            centred (wide viewports) or scrolls horizontally (narrow viewports). */}
+        <div style={{ position: 'relative', width: 'fit-content', margin: '0 auto' }}>
           {isMapBackdropVisible && activeMapUrl && (
             <div
               aria-hidden="true"
               style={{
                 position: 'absolute',
-                top: '32px',
-                left: '38px',
-                width: `${effectiveMapSize.width * 42}px`,
-                height: `${effectiveMapSize.height * 42}px`,
+                top: `${HEADER_ROW_PX}px`,
+                left: `${LABEL_COL_PX}px`,
+                width: `${effectiveMapSize.width * CELL_PX}px`,
+                height: `${effectiveMapSize.height * CELL_PX}px`,
                 backgroundImage: `url(${activeMapUrl})`,
                 backgroundSize: backdropSize,
                 backgroundPosition: backdropPosition,
@@ -894,31 +906,30 @@ export function CombatMap({
             aria-rowcount={effectiveMapSize.height}
             aria-colcount={effectiveMapSize.width}
             style={{
-              borderCollapse: 'collapse',
-              margin: '0 auto',
+              // An explicit width keeps the automatic layout from shrinking the cells to fit a narrow
+              // viewport, and separate borders keep each column and row at exactly CELL_PX (collapsed
+              // borders plus the browser's default cell padding made them a few pixels larger).
+              borderCollapse: 'separate',
+              borderSpacing: 0,
               tableLayout: 'fixed',
+              width: `${LABEL_COL_PX + effectiveMapSize.width * CELL_PX}px`,
               position: 'relative',
               zIndex: 1,
               backgroundColor: 'transparent'
             }}
           >
+            <colgroup>
+              <col style={{ width: `${LABEL_COL_PX}px` }} />
+              {Array.from({ length: effectiveMapSize.width }, (_, colIdx) => (
+                <col key={colIdx} style={{ width: `${CELL_PX}px` }} />
+              ))}
+            </colgroup>
             <thead aria-hidden="true">
               <tr style={{ userSelect: 'none' }}>
                 {/* Corner Empty Header */}
-                <th style={{ width: '38px', height: '32px', backgroundColor: '#212529', border: '1px solid #343a40' }} />
+                <th className="combat-grid-header combat-grid-corner" />
                 {Array.from({ length: effectiveMapSize.width }, (_, colIdx) => (
-                  <th
-                    key={colIdx}
-                    style={{
-                      width: '42px',
-                      height: '32px',
-                      backgroundColor: '#212529',
-                      color: '#ced4da',
-                      fontSize: '0.75rem',
-                      textAlign: 'center',
-                      border: '1px solid #343a40'
-                    }}
-                  >
+                  <th key={colIdx} className="combat-grid-header">
                     {columnIndexToLabel(colIdx)}
                   </th>
                 ))}
@@ -931,19 +942,7 @@ export function CombatMap({
               {Array.from({ length: effectiveMapSize.height }, (_, rowIdx) => (
                 <tr key={rowIdx} role="row">
                   {/* Row Number (Visual guide only, aria-hidden so screen readers don't prefix with row number) */}
-                  <td
-                    aria-hidden="true"
-                    style={{
-                      width: '38px',
-                      height: '42px',
-                      backgroundColor: '#212529',
-                      color: '#ced4da',
-                      fontSize: '0.75rem',
-                      textAlign: 'center',
-                      border: '1px solid #343a40',
-                      userSelect: 'none'
-                    }}
-                  >
+                  <td aria-hidden="true" className="combat-grid-row-label">
                     {rowIdx + 1}
                   </td>
 

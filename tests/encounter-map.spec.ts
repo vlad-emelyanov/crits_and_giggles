@@ -142,4 +142,61 @@ test.describe('Encounter Map Accessibility and Workflow Suite', () => {
 
     await encounterPage.close();
   });
+
+  test('Combat Map backdrop lines up with the grid cells at narrow and wide viewports', async ({ page, context }) => {
+    await page.keyboard.press('Alt+m');
+    await expect(page.getByRole('heading', { name: 'Run Mode' })).toBeVisible();
+
+    const [encounterPage] = await Promise.all([
+      context.waitForEvent('page'),
+      page.getByRole('link', { name: /Run Map 5\.1: Palma Flora/ }).click()
+    ]);
+    await encounterPage.waitForLoadState();
+
+    const startBtn = encounterPage.getByRole('button', { name: 'Start Combat' });
+    await expect(startBtn).toBeVisible();
+    await startBtn.click();
+    await expect(startBtn).not.toBeVisible();
+
+    const backdropSelector = '.combat-map-section div[aria-hidden="true"][style*="background-image"]';
+    await expect(encounterPage.locator(backdropSelector)).toBeVisible();
+
+    // One battlemap square is scaled to exactly one 42px cell, so every cell has to sit on the backdrop
+    // at (column * 42, row * 42) from its top-left corner: at 1024px the board is wider than the page
+    // and scrolls, at 1800px it is centred with room to spare. Before the fix the automatic table layout
+    // squeezed the cells to fit the narrow page, collapsed borders and default cell padding made every
+    // column and row a few pixels bigger than a square, and the centred table drifted off the backdrop.
+    for (const width of [1024, 1800]) {
+      await encounterPage.setViewportSize({ width, height: 900 });
+      const metrics = await encounterPage.evaluate((selector) => {
+        const grid = document.querySelector('table[role="grid"]')!;
+        const cols = Number(grid.getAttribute('aria-colcount'));
+        const rows = Number(grid.getAttribute('aria-rowcount'));
+        const rect = (css: string) => document.querySelector(css)!.getBoundingClientRect();
+        const backdrop = rect(selector);
+        const first = rect('[data-cell="0-0"]');
+        const next = rect('[data-cell="1-1"]');
+        const last = rect(`[data-cell="${cols - 1}-${rows - 1}"]`);
+        return {
+          cols,
+          rows,
+          cell: { w: first.width, h: first.height },
+          pitch: { x: next.left - first.left, y: next.top - first.top },
+          backdrop: { w: backdrop.width, h: backdrop.height },
+          firstOffset: { x: first.left - backdrop.left, y: first.top - backdrop.top },
+          lastOffset: { x: last.right - backdrop.right, y: last.bottom - backdrop.bottom }
+        };
+      }, backdropSelector);
+
+      expect(metrics.cell, `cell size at ${width}px`).toEqual({ w: 42, h: 42 });
+      expect(metrics.pitch, `cell pitch at ${width}px`).toEqual({ x: 42, y: 42 });
+      expect(metrics.backdrop, `backdrop size at ${width}px`).toEqual({ w: metrics.cols * 42, h: metrics.rows * 42 });
+      expect(Math.abs(metrics.firstOffset.x), `A1 left edge at ${width}px`).toBeLessThan(0.5);
+      expect(Math.abs(metrics.firstOffset.y), `A1 top edge at ${width}px`).toBeLessThan(0.5);
+      expect(Math.abs(metrics.lastOffset.x), `last cell right edge at ${width}px`).toBeLessThan(0.5);
+      expect(Math.abs(metrics.lastOffset.y), `last cell bottom edge at ${width}px`).toBeLessThan(0.5);
+    }
+
+    await encounterPage.close();
+  });
 });

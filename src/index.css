@@ -72,27 +72,62 @@ main {
   border: 0;
 }
 
-/* Combat Map Grid Cell Optimization */
+/* Combat Map board (CombatMap.tsx).
+   Every cell is border-box with no padding and draws only its right and bottom border, so a grid
+   cell is exactly 42px square, the header row exactly 32px tall and the row-label column exactly
+   38px wide: the battlemap backdrop is scaled and positioned to those sizes (CELL_PX, HEADER_ROW_PX
+   and LABEL_COL_PX in CombatMap.tsx). */
+.combat-grid-header,
+.combat-grid-row-label {
+  box-sizing: border-box;
+  padding: 0;
+  border: 0 solid #343a40;
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+  background-color: #212529;
+  color: #ced4da;
+  font-size: 0.75rem;
+  text-align: center;
+  user-select: none;
+}
+
+.combat-grid-header {
+  width: 42px;
+  height: 32px;
+}
+
+.combat-grid-header.combat-grid-corner,
+.combat-grid-row-label {
+  width: 38px;
+}
+
+.combat-grid-row-label {
+  height: 42px;
+}
+
 .combat-grid-cell {
   width: 42px;
   height: 42px;
+  box-sizing: border-box;
+  padding: 0;
+  border: 0 solid transparent;
+  border-right-width: 1px;
+  border-bottom-width: 1px;
   text-align: center;
   vertical-align: middle;
   cursor: pointer;
   position: relative;
-  padding: 0;
   outline: none;
-  box-sizing: border-box;
 }
 
 .combat-grid-cell.no-art {
   background-color: #16191c;
-  border: 1px solid #2b3035;
+  border-color: #2b3035;
 }
 
 .combat-grid-cell.with-art {
   background-color: rgba(20, 24, 28, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 .combat-grid-cell.is-focused {
